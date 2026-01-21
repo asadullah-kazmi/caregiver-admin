@@ -268,31 +268,31 @@ const PictogramManagement = () => {
                     <FaClock className="mr-1" />
                     {pictogram.uploadedAt ? format(new Date(pictogram.uploadedAt), 'MMM dd, yyyy') : 'N/A'}
                   </p>
-                  <div className="flex space-x-2">
+                  <div className="flex space-x-2 min-w-0">
                     <button
                       onClick={() => handleEdit(pictogram)}
-                      className="flex items-center justify-center px-3 py-2.5 bg-primary text-white rounded-card hover:bg-primary-dark transition-all duration-200 shadow-sm"
+                      className="flex-shrink-0 flex items-center justify-center w-10 h-10 bg-primary text-white rounded-card hover:bg-primary-dark transition-all duration-200 shadow-sm"
                       title="Edit pictogram"
                     >
-                      <FaEdit className="text-lg" />
+                      <FaEdit className="text-base" />
                     </button>
                     <button
                       onClick={() => handleToggleActive(pictogram)}
-                      className={`flex-1 flex items-center justify-center px-4 py-2.5 rounded-card text-sm font-semibold transition-all duration-200 shadow-sm ${
+                      className={`flex-1 flex items-center justify-center min-w-0 px-2 py-2.5 rounded-card text-xs font-semibold transition-all duration-200 shadow-sm ${
                         pictogram.isActive
                           ? 'bg-error text-white hover:bg-opacity-90'
                           : 'bg-accent text-white hover:bg-opacity-90'
                       }`}
                     >
-                      {pictogram.isActive ? <FaTimes className="mr-1.5" /> : <FaCheck className="mr-1.5" />}
-                      {pictogram.isActive ? 'Deactivate' : 'Activate'}
+                      {pictogram.isActive ? <FaTimes className="mr-1 flex-shrink-0" /> : <FaCheck className="mr-1 flex-shrink-0" />}
+                      <span className="truncate">{pictogram.isActive ? 'Deactivate' : 'Activate'}</span>
                     </button>
                     <button
                       onClick={() => handleDelete(pictogram)}
-                      className="flex items-center justify-center px-3 py-2.5 bg-error text-white rounded-card hover:bg-opacity-90 transition-all duration-200 shadow-sm"
+                      className="flex-shrink-0 flex items-center justify-center w-10 h-10 bg-error text-white rounded-card hover:bg-opacity-90 transition-all duration-200 shadow-sm"
                       title="Delete pictogram"
                     >
-                      <FaTrash className="text-lg" />
+                      <FaTrash className="text-base" />
                     </button>
                   </div>
                 </div>
