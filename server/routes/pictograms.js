@@ -54,32 +54,102 @@ router.get('/', verifyAdmin, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
-    const category = req.query.category || '';
-    const search = req.query.search || '';
+    const category = req.query.category?.trim() || '';
+    const search = req.query.search?.trim() || '';
     const offset = (page - 1) * limit;
 
-    let query = admin.firestore().collection('custom_pictograms');
+    let snapshot;
+    const categoryId = category && category.trim() ? category.trim() : null;
 
-    // Apply filters
-    if (category) {
-      query = query.where('category', '==', category);
+    // Try to apply category filter with Firestore query
+    if (categoryId) {
+      console.log('Attempting Firestore query with category filter:', categoryId);
+      
+      try {
+        // Try query with category filter and orderBy
+        let query = admin.firestore()
+          .collection('custom_pictograms')
+          .where('category', '==', categoryId)
+          .orderBy('uploadedAt', 'desc');
+        snapshot = await query.get();
+        console.log(`Firestore query successful: Found ${snapshot.docs.length} pictograms`);
+      } catch (error) {
+        // If query fails (likely missing composite index), fetch all and filter client-side
+        console.warn('Firestore query failed, falling back to client-side filter:', error.message);
+        console.warn('Error code:', error.code, 'Error details:', error);
+        let query = admin.firestore()
+          .collection('custom_pictograms')
+          .orderBy('uploadedAt', 'desc');
+        snapshot = await query.get();
+        console.log(`Fetched all pictograms (${snapshot.docs.length}), will filter client-side`);
+      }
+    } else {
+      console.log('No category filter - fetching all pictograms');
+      let query = admin.firestore()
+        .collection('custom_pictograms')
+        .orderBy('uploadedAt', 'desc');
+      snapshot = await query.get();
+    }
+    
+    let pictograms = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      uploadedAt: doc.data().uploadedAt?.toDate() || null
+    }));
+
+    // ALWAYS apply category filter client-side as a double-check
+    // This ensures filtering works even if Firestore query had issues
+    if (categoryId) {
+      const beforeFilter = pictograms.length;
+      
+      let debugCount = 0;
+      pictograms = pictograms.filter(p => {
+        // Handle different data types: string, number, null, undefined
+        if (p.category === null || p.category === undefined) {
+          return false;
+        }
+        // Convert to string and trim for comparison
+        const picCategory = String(p.category).trim();
+        const match = picCategory === categoryId;
+        
+        // Debug first few mismatches
+        if (!match && debugCount < 3) {
+          console.log(`Mismatch: Pictogram "${p.keyword}" has category "${picCategory}" (type: ${typeof p.category}), looking for "${categoryId}"`);
+          debugCount++;
+        }
+        
+        return match;
+      });
+      
+      console.log(`Category filter: ${beforeFilter} -> ${pictograms.length} pictograms for category "${categoryId}"`);
+      
+      if (pictograms.length === 0 && beforeFilter > 0) {
+        // Debug: Show what category values we actually have
+        const uniqueCategories = new Set();
+        snapshot.docs.forEach(doc => {
+          const cat = doc.data().category;
+          if (cat !== null && cat !== undefined) {
+            uniqueCategories.add(String(cat).trim());
+          }
+        });
+        console.log('Unique category values found in database:', Array.from(uniqueCategories));
+        console.log('Looking for category ID:', categoryId);
+        console.log('Available category IDs:', Array.from(uniqueCategories));
+      }
     }
 
-    if (search) {
-      query = query.where('keyword', '>=', search)
-                   .where('keyword', '<=', search + '\uf8ff');
+    // Apply search filter client-side if provided
+    if (search && search.trim() !== '') {
+      const searchLower = search.toLowerCase().trim();
+      pictograms = pictograms.filter(p => 
+        p.keyword?.toLowerCase().includes(searchLower)
+      );
     }
 
-    const snapshot = await query.orderBy('uploadedAt', 'desc').get();
-    const total = snapshot.size;
-
-    const pictograms = snapshot.docs
-      .slice(offset, offset + limit)
-      .map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        uploadedAt: doc.data().uploadedAt?.toDate() || null
-      }));
+    const total = pictograms.length;
+    
+    // Apply pagination after filtering
+    pictograms = pictograms.slice(offset, offset + limit);
 
     res.json({
       pictograms,

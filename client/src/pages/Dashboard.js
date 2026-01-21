@@ -1,15 +1,28 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchDashboardStats } from '../store/thunks/statsThunks';
+import { fetchCategories } from '../store/thunks/categoriesThunks';
 import { FaUsers, FaImages, FaFolder, FaUser, FaClock, FaTags, FaInbox } from 'react-icons/fa';
 import { format } from 'date-fns';
 
 const Dashboard = () => {
   const dispatch = useDispatch();
   const { stats, recentUsers, recentPictograms, recentRequests, loading } = useSelector((state) => state.stats);
+  const categories = useSelector((state) => state.categories.categories || []);
+
+  // Create category map for quick lookup
+  const categoryMap = useMemo(() => {
+    const map = {};
+    categories.forEach(cat => {
+      map[cat.id] = cat.nameEn || cat.name || cat.nameNl || 'Uncategorized';
+    });
+    return map;
+  }, [categories]);
 
   useEffect(() => {
     dispatch(fetchDashboardStats());
+    // Fetch categories to map IDs to names
+    dispatch(fetchCategories({ page: 1, limit: 100, status: '', search: '' }));
   }, [dispatch]);
 
   const statCards = [
@@ -108,21 +121,21 @@ const Dashboard = () => {
               Recent Users
             </h2>
           </div>
-          <div className="p-6 space-y-3">
+          <div className="p-6 space-y-3 max-h-[600px] overflow-y-auto">
             {recentUsers.length > 0 ? (
               recentUsers.map((user) => (
-                <div key={user.id} className="flex items-center justify-between p-4 bg-surface-white rounded-card border border-primary-light hover:shadow-md transition-all duration-200 hover:border-primary">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white font-semibold shadow-md text-body-md">
+                <div key={user.id} className="flex items-center justify-between p-4 bg-surface-white rounded-card border border-primary-light hover:shadow-md transition-all duration-200 hover:border-primary min-w-0">
+                  <div className="flex items-center space-x-3 min-w-0 flex-1">
+                    <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white font-semibold shadow-md text-body-md flex-shrink-0">
                       {user.name?.charAt(0)?.toUpperCase() || 'U'}
                     </div>
-                    <div>
-                      <p className="font-semibold text-text-primary">{user.name}</p>
-                      <p className="text-sm text-gray-500">{user.email}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-text-primary truncate">{user.name || 'N/A'}</p>
+                      <p className="text-sm text-gray-500 truncate">{user.email || 'N/A'}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-400 flex items-center justify-end">
+                  <div className="text-right flex-shrink-0 ml-2">
+                    <p className="text-xs text-gray-400 flex items-center justify-end whitespace-nowrap">
                       <FaClock className="mr-1" />
                       {user.createdAt ? format(new Date(user.createdAt), 'MMM dd, yyyy') : 'N/A'}
                     </p>
@@ -146,25 +159,27 @@ const Dashboard = () => {
               Recent Pictograms
             </h2>
           </div>
-          <div className="p-6 space-y-3">
+          <div className="p-6 space-y-3 max-h-[600px] overflow-y-auto">
             {recentPictograms.length > 0 ? (
               recentPictograms.map((pictogram) => (
-                <div key={pictogram.id} className="flex items-center justify-between p-4 bg-surface-white rounded-card border border-primary-light hover:shadow-md transition-all duration-200 hover:border-primary">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-16 h-16 rounded-xl overflow-hidden shadow-lg border-3 border-white ring-2 ring-green-200">
+                <div key={pictogram.id} className="flex items-center justify-between p-4 bg-surface-white rounded-card border border-primary-light hover:shadow-md transition-all duration-200 hover:border-primary min-w-0">
+                  <div className="flex items-center space-x-3 min-w-0 flex-1">
+                    <div className="w-16 h-16 rounded-xl overflow-hidden shadow-lg border-3 border-white ring-2 ring-green-200 flex-shrink-0">
                       <img
                         src={pictogram.imageUrl}
                         alt={pictogram.keyword}
                         className="w-full h-full object-cover"
                       />
                     </div>
-                    <div>
-                      <p className="font-semibold text-text-primary">{pictogram.keyword}</p>
-                      <p className="text-sm text-gray-500 capitalize">{pictogram.category}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-text-primary truncate">{pictogram.keyword || 'N/A'}</p>
+                      <p className="text-sm text-gray-500 capitalize truncate">
+                        {categoryMap[pictogram.category] || 'Uncategorized'}
+                      </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-400 flex items-center justify-end">
+                  <div className="text-right flex-shrink-0 ml-2">
+                    <p className="text-xs text-gray-400 flex items-center justify-end whitespace-nowrap">
                       <FaClock className="mr-1" />
                       {pictogram.uploadedAt ? format(new Date(pictogram.uploadedAt), 'MMM dd, yyyy') : 'N/A'}
                     </p>
@@ -188,23 +203,23 @@ const Dashboard = () => {
               Recent Requests
             </h2>
           </div>
-          <div className="p-6 space-y-3">
+          <div className="p-6 space-y-3 max-h-[600px] overflow-y-auto">
             {recentRequests && recentRequests.length > 0 ? (
               recentRequests.map((request) => (
-                <div key={request.id} className="flex items-center justify-between p-4 bg-surface-white rounded-card border border-primary-light hover:shadow-md transition-all duration-200 hover:border-primary">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-accent rounded-full flex items-center justify-center text-white font-semibold shadow-md text-body-md">
+                <div key={request.id} className="flex items-center justify-between p-4 bg-surface-white rounded-card border border-primary-light hover:shadow-md transition-all duration-200 hover:border-primary min-w-0">
+                  <div className="flex items-center space-x-3 min-w-0 flex-1">
+                    <div className="w-12 h-12 bg-accent rounded-full flex items-center justify-center text-white font-semibold shadow-md text-body-md flex-shrink-0">
                       {request.keyword?.charAt(0)?.toUpperCase() || 'R'}
                     </div>
-                    <div>
-                      <p className="font-semibold text-text-primary">{request.keyword}</p>
-                      <p className="text-sm text-gray-500 capitalize">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-text-primary truncate">{request.keyword || 'N/A'}</p>
+                      <p className="text-sm text-gray-500 capitalize truncate">
                         {request.status || 'pending'}
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-400 flex items-center justify-end">
+                  <div className="text-right flex-shrink-0 ml-2">
+                    <p className="text-xs text-gray-400 flex items-center justify-end whitespace-nowrap">
                       <FaClock className="mr-1" />
                       {request.createdAt ? format(new Date(request.createdAt), 'MMM dd, yyyy') : 'N/A'}
                     </p>

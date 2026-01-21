@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { fetchCategories, createCategory, updateCategory, deleteCategory } from '../store/thunks/categoriesThunks';
 import { FaPlus, FaEdit, FaTrash, FaSearch, FaFilter, FaTags } from 'react-icons/fa';
 import { format } from 'date-fns';
 
 const CategoryManagement = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { categories, loading, pagination } = useSelector((state) => state.categories);
   const [currentPage, setCurrentPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -80,6 +82,11 @@ const CategoryManagement = () => {
     } catch (error) {
       alert(error.message || 'Failed to update category');
     }
+  };
+
+  const handleCategoryClick = (category) => {
+    // Navigate to pictograms page with category filter
+    navigate(`/pictograms?category=${category.id}`);
   };
 
   return (
@@ -161,16 +168,38 @@ const CategoryManagement = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {categories.map((category) => (
                     <tr key={category.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td 
+                        className="px-6 py-4 whitespace-nowrap cursor-pointer"
+                        onClick={() => handleCategoryClick(category)}
+                        title="Click to view pictograms in this category"
+                      >
                         <div className="text-sm font-medium text-gray-900">{category.name}</div>
                         {category.description && (
                           <div className="text-sm text-gray-500">{category.description}</div>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{category.nameEn}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{category.nameNl}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{category.pictogramCount || 0}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td 
+                        className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 cursor-pointer"
+                        onClick={() => handleCategoryClick(category)}
+                      >
+                        {category.nameEn}
+                      </td>
+                      <td 
+                        className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 cursor-pointer"
+                        onClick={() => handleCategoryClick(category)}
+                      >
+                        {category.nameNl}
+                      </td>
+                      <td 
+                        className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 cursor-pointer"
+                        onClick={() => handleCategoryClick(category)}
+                      >
+                        {category.pictogramCount || 0}
+                      </td>
+                      <td 
+                        className="px-6 py-4 whitespace-nowrap cursor-pointer"
+                        onClick={() => handleCategoryClick(category)}
+                      >
                         <span
                           className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                             category.isActive
@@ -181,11 +210,14 @@ const CategoryManagement = () => {
                           {category.isActive ? 'Active' : 'Inactive'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td 
+                        className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 cursor-pointer"
+                        onClick={() => handleCategoryClick(category)}
+                      >
                         {category.createdAt ? format(new Date(category.createdAt), 'MMM dd, yyyy') : 'N/A'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
+                        <div className="flex space-x-2" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => handleEdit(category)}
                             className="text-primary hover:text-primary-dark"

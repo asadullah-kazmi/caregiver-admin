@@ -1,17 +1,37 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useSearchParams } from 'react-router-dom';
 import { fetchPictograms, uploadPictogram, updatePictogram, deletePictogram } from '../store/thunks/pictogramsThunks';
-import { fetchActiveCategories } from '../store/thunks/categoriesThunks';
+import { fetchCategories, fetchActiveCategories } from '../store/thunks/categoriesThunks';
 import { setSearch, setCategory } from '../store/slices/pictogramsSlice';
 import { FaSearch, FaUpload, FaEdit, FaTrash, FaCheck, FaTimes, FaClock, FaImages } from 'react-icons/fa';
 import { format } from 'date-fns';
 
 const PictogramManagement = () => {
   const dispatch = useDispatch();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { pictograms, loading, pagination, search, category } = useSelector((state) => state.pictograms);
   const categoriesFromStore = useSelector((state) => state.categories.categories);
   const activeCategories = useMemo(() => categoriesFromStore || [], [categoriesFromStore]);
+  // All categories for filter dropdown (including inactive)
+  const allCategories = useMemo(() => categoriesFromStore || [], [categoriesFromStore]);
   const [currentPage, setCurrentPage] = useState(1);
+  
+  // Read category from URL params on mount and when URL changes
+  useEffect(() => {
+    const categoryParam = searchParams.get('category');
+    const currentCategory = category || '';
+    
+    if (categoryParam !== null) {
+      // URL param exists - use it (even if empty string)
+      if (categoryParam !== currentCategory) {
+        dispatch(setCategory(categoryParam || ''));
+      }
+    } else if (currentCategory !== '') {
+      // URL param doesn't exist but Redux has a category - clear it
+      dispatch(setCategory(''));
+    }
+  }, [searchParams, dispatch, category]);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedPictogram, setSelectedPictogram] = useState(null);
@@ -32,7 +52,15 @@ const PictogramManagement = () => {
   const [categoryMap, setCategoryMap] = useState({});
 
   useEffect(() => {
+    console.log('PictogramManagement: Fetching with filters', { 
+      page: currentPage, 
+      search: search || '(empty)', 
+      category: category || '(empty)' 
+    });
     dispatch(fetchPictograms({ page: currentPage, search, category }));
+    // Fetch all categories for the filter dropdown (not just active)
+    dispatch(fetchCategories({ page: 1, limit: 100, status: '', search: '' }));
+    // Also fetch active categories for upload/edit modals
     dispatch(fetchActiveCategories());
   }, [dispatch, currentPage, search, category]);
 
@@ -52,9 +80,19 @@ const PictogramManagement = () => {
   };
 
   const handleCategoryChange = (e) => {
-    const value = e.target.value;
+    const value = e.target.value || '';
     dispatch(setCategory(value));
+    dispatch(setSearch('')); // Clear search when category changes
     setCurrentPage(1);
+    // Update URL params - remove category param if empty
+    if (value && value.trim()) {
+      setSearchParams({ category: value });
+    } else {
+      // Remove category from URL when "All Categories" is selected
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('category');
+      setSearchParams(newParams);
+    }
   };
 
   const handleImageSelect = (e) => {
@@ -187,9 +225,9 @@ const PictogramManagement = () => {
             className="w-full px-4 py-3 border border-primary-light rounded-input focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 bg-surface-white shadow-sm"
           >
             <option value="">All Categories</option>
-            {activeCategories.map((cat) => (
+            {allCategories.map((cat) => (
               <option key={cat.id} value={cat.id}>
-                {cat.nameEn || cat.name || cat.nameNl}
+                {cat.nameEn || cat.name || cat.nameNl} {!cat.isActive && '(Inactive)'}
               </option>
             ))}
           </select>
@@ -233,10 +271,10 @@ const PictogramManagement = () => {
                   <div className="flex space-x-2">
                     <button
                       onClick={() => handleEdit(pictogram)}
-                      className="flex-1 flex items-center justify-center px-4 py-2.5 bg-primary text-white rounded-card hover:bg-primary-dark transition-all duration-200 text-sm font-semibold shadow-sm"
+                      className="flex items-center justify-center px-3 py-2.5 bg-primary text-white rounded-card hover:bg-primary-dark transition-all duration-200 shadow-sm"
+                      title="Edit pictogram"
                     >
-                      <FaEdit className="mr-1.5" />
-                      Edit
+                      <FaEdit className="text-lg" />
                     </button>
                     <button
                       onClick={() => handleToggleActive(pictogram)}
@@ -251,10 +289,10 @@ const PictogramManagement = () => {
                     </button>
                     <button
                       onClick={() => handleDelete(pictogram)}
-                      className="flex-1 flex items-center justify-center px-4 py-2.5 bg-error text-white rounded-card hover:bg-opacity-90 transition-all duration-200 text-sm font-semibold shadow-sm"
+                      className="flex items-center justify-center px-3 py-2.5 bg-error text-white rounded-card hover:bg-opacity-90 transition-all duration-200 shadow-sm"
+                      title="Delete pictogram"
                     >
-                      <FaTrash className="mr-1.5" />
-                      Delete
+                      <FaTrash className="text-lg" />
                     </button>
                   </div>
                 </div>
@@ -364,7 +402,6 @@ const PictogramManagement = () => {
                   required
                   className="w-full px-4 py-2 border border-primary-light rounded-input focus:ring-2 focus:ring-primary focus:border-primary text-body-md"
                 >
-                  <option value="">Select category</option>
                   <option value="">Select category</option>
                   {activeCategories.map((cat) => (
                     <option key={cat.id} value={cat.id}>

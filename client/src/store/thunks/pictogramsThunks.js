@@ -8,8 +8,13 @@ export const fetchPictograms = createAsyncThunk(
     try {
       dispatch(setLoading(true));
       const params = { page, limit: 20 };
-      if (search) params.search = search;
-      if (category) params.category = category;
+      if (search && search.trim()) params.search = search.trim();
+      if (category && category.trim()) {
+        params.category = category.trim();
+        console.log('Frontend: Sending category filter:', params.category);
+      } else {
+        console.log('Frontend: No category filter');
+      }
       
       const response = await api.get('/pictograms', { params });
       dispatch(setPictograms(response.data));
