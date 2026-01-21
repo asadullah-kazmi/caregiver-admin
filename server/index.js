@@ -2,7 +2,11 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
-const serviceAccount = require('./serviceAccountKey.json');
+
+// Use env var for Firebase service account on Vercel, fall back to local file for dev
+const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
+  ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+  : require('./serviceAccountKey.json');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const pictogramRoutes = require('./routes/pictograms');
@@ -28,7 +32,12 @@ admin.initializeApp({
 console.log(`Firebase initialized with storage bucket: ${storageBucket}`);
 
 // Middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -45,31 +54,37 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// Export the app for Vercel serverless functions
+module.exports = app;
 
-// Gracefully handle port-in-use errors in development
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    const fallbackPort = PORT + 1;
-    console.error(
-      `Port ${PORT} is already in use. Trying fallback port ${fallbackPort}...`
-    );
+// Only start the server if not running in Vercel serverless mode
+if (process.env.VERCEL !== '1') {
+  const server = app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
 
-    app
-      .listen(fallbackPort, () => {
-        console.log(`Server running on fallback port ${fallbackPort}`);
-      })
-      .on('error', (fallbackErr) => {
-        console.error(
-          `Failed to start server on fallback port ${fallbackPort}:`,
-          fallbackErr
-        );
-        process.exit(1);
-      });
-  } else {
-    console.error('Server failed to start:', err);
-    process.exit(1);
-  }
-});
+  // Gracefully handle port-in-use errors in development
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      const fallbackPort = PORT + 1;
+      console.error(
+        `Port ${PORT} is already in use. Trying fallback port ${fallbackPort}...`
+      );
+
+      app
+        .listen(fallbackPort, () => {
+          console.log(`Server running on fallback port ${fallbackPort}`);
+        })
+        .on('error', (fallbackErr) => {
+          console.error(
+            `Failed to start server on fallback port ${fallbackPort}:`,
+            fallbackErr
+          );
+          process.exit(1);
+        });
+    } else {
+      console.error('Server failed to start:', err);
+      process.exit(1);
+    }
+  });
+}
