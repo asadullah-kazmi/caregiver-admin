@@ -32,9 +32,30 @@ admin.initializeApp({
 console.log(`Firebase initialized with storage bucket: ${storageBucket}`);
 
 // Middleware
+// CORS configuration: Allow frontend domain (for separate Vercel projects)
+// In production, replace with your actual frontend URL
+const allowedOrigins = [
+  'http://localhost:3000', // Local development
+  process.env.FRONTEND_URL, // Production frontend URL (set in Vercel env vars)
+  // Vercel preview deployments will be added dynamically
+];
+
 app.use(
   cors({
-    origin: true,
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      // Allow if origin is in allowed list or matches Vercel preview pattern
+      if (
+        allowedOrigins.includes(origin) ||
+        origin.includes('.vercel.app') // Allow all Vercel preview deployments
+      ) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
   })
 );
