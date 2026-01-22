@@ -37,7 +37,7 @@ const PictogramManagement = () => {
   const [selectedPictogram, setSelectedPictogram] = useState(null);
   const [uploadForm, setUploadForm] = useState({
     keyword: '',
-    category: '',
+    categories: [], // Changed to array for multiple selection
     description: '',
     image: null,
     preview: null,
@@ -116,8 +116,8 @@ const PictogramManagement = () => {
 
   const handleUpload = async (e) => {
     e.preventDefault();
-    if (!uploadForm.keyword || !uploadForm.category || !uploadForm.image) {
-      alert('Please fill in all required fields');
+    if (!uploadForm.keyword || !uploadForm.categories || uploadForm.categories.length === 0 || !uploadForm.image) {
+      alert('Please fill in all required fields and select at least one category');
       return;
     }
 
@@ -126,12 +126,17 @@ const PictogramManagement = () => {
       const formData = new FormData();
       formData.append('image', uploadForm.image);
       formData.append('keyword', uploadForm.keyword);
-      formData.append('category', uploadForm.category);
+      // Send categories as comma-separated string or JSON array
+      formData.append('categories', JSON.stringify(uploadForm.categories));
       formData.append('description', uploadForm.description);
 
-      await dispatch(uploadPictogram(formData)).unwrap();
+      const result = await dispatch(uploadPictogram(formData)).unwrap();
       setShowUploadModal(false);
-      setUploadForm({ keyword: '', category: '', description: '', image: null, preview: null });
+      setUploadForm({ keyword: '', categories: [], description: '', image: null, preview: null });
+      // Show success message if available
+      if (result.message) {
+        alert(result.message);
+      }
       dispatch(fetchPictograms({ page: currentPage, search, category }));
     } catch (error) {
       alert(error.message || 'Failed to upload pictogram');
@@ -348,7 +353,7 @@ const PictogramManagement = () => {
               <button
                 onClick={() => {
                   setShowUploadModal(false);
-                  setUploadForm({ keyword: '', category: '', description: '', image: null, preview: null });
+                  setUploadForm({ keyword: '', categories: [], description: '', image: null, preview: null });
                 }}
                 className="text-gray-400 hover:text-gray-600 text-2xl"
               >
@@ -393,22 +398,53 @@ const PictogramManagement = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Category <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Categories <span className="text-red-500">*</span>
+                  <span className="text-xs text-gray-500 ml-2 font-normal">
+                    (Select one or more categories)
+                  </span>
                 </label>
-                <select
-                  value={uploadForm.category}
-                  onChange={(e) => setUploadForm({ ...uploadForm, category: e.target.value })}
-                  required
-                  className="w-full px-4 py-2 border border-primary-light rounded-input focus:ring-2 focus:ring-primary focus:border-primary text-body-md"
-                >
-                  <option value="">Select category</option>
-                  {activeCategories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.nameEn || cat.name || cat.nameNl}
-                    </option>
-                  ))}
-                </select>
+                <div className="border border-primary-light rounded-input p-3 max-h-48 overflow-y-auto bg-white">
+                  {activeCategories.length === 0 ? (
+                    <p className="text-sm text-gray-500">No active categories available</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {activeCategories.map((cat) => (
+                        <label
+                          key={cat.id}
+                          className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={uploadForm.categories.includes(cat.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setUploadForm({
+                                  ...uploadForm,
+                                  categories: [...uploadForm.categories, cat.id],
+                                });
+                              } else {
+                                setUploadForm({
+                                  ...uploadForm,
+                                  categories: uploadForm.categories.filter((id) => id !== cat.id),
+                                });
+                              }
+                            }}
+                            className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary focus:ring-2"
+                          />
+                          <span className="text-sm text-gray-700">
+                            {cat.nameEn || cat.name || cat.nameNl}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {uploadForm.categories.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {uploadForm.categories.length} categor{uploadForm.categories.length === 1 ? 'y' : 'ies'} selected
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

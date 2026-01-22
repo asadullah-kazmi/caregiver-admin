@@ -173,21 +173,39 @@ router.post('/upload', verifyAdmin, upload.single('image'), async (req, res) => 
       return res.status(400).json({ error: 'No image file provided' });
     }
 
-    const { keyword, category, description } = req.body;
+    const { keyword, category, categories, description } = req.body;
 
-    if (!keyword || !category) {
-      return res.status(400).json({ error: 'Keyword and category are required' });
+    // Support both old format (single category) and new format (categories array)
+    let categoryArray = [];
+    if (categories) {
+      try {
+        // Parse JSON string if it's a string, otherwise use as-is
+        categoryArray = typeof categories === 'string' ? JSON.parse(categories) : categories;
+        if (!Array.isArray(categoryArray)) {
+          categoryArray = [categoryArray];
+        }
+      } catch (parseError) {
+        // If parsing fails, try treating it as comma-separated string
+        categoryArray = categories.split(',').map(c => c.trim()).filter(c => c);
+      }
+    } else if (category) {
+      // Backward compatibility: single category
+      categoryArray = [category];
     }
 
-    // Generate unique ID
-    const pictogramId = admin.firestore().collection('custom_pictograms').doc().id;
+    if (!keyword || categoryArray.length === 0) {
+      return res.status(400).json({ error: 'Keyword and at least one category are required' });
+    }
 
-    // Upload to Cloudinary
+    // Generate base ID for the pictogram (used for Cloudinary public_id)
+    const basePictogramId = admin.firestore().collection('custom_pictograms').doc().id;
+
+    // Upload to Cloudinary once (same image for all category instances)
     const uploadResult = await new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
           folder: 'pictograms',
-          public_id: pictogramId,
+          public_id: basePictogramId,
           resource_type: 'image',
           format: 'png',
           overwrite: false
@@ -201,26 +219,40 @@ router.post('/upload', verifyAdmin, upload.single('image'), async (req, res) => 
       uploadStream.end(req.file.buffer);
     });
 
-    // Create Firestore document
-    const pictogramData = {
-      keyword: keyword.trim(),
-      category: category, // Store category ID
-      imageUrl: uploadResult.secure_url,
-      description: description?.trim() || null,
-      isActive: true,
-      uploadedAt: admin.firestore.FieldValue.serverTimestamp(),
-      uploadedBy: req.user.uid
-    };
+    // Create multiple Firestore documents, one for each category
+    const createdPictograms = [];
+    const timestamp = admin.firestore.FieldValue.serverTimestamp();
+    const currentTime = new Date();
 
-    await admin.firestore().collection('custom_pictograms').doc(pictogramId).set(pictogramData);
+    for (const categoryId of categoryArray) {
+      // Generate unique ID for each document
+      const pictogramId = admin.firestore().collection('custom_pictograms').doc().id;
+
+      // Create Firestore document with same imageUrl but different category
+      const pictogramData = {
+        keyword: keyword.trim(),
+        category: categoryId.trim(), // Store category ID
+        imageUrl: uploadResult.secure_url, // Same Cloudinary URL for all instances
+        description: description?.trim() || null,
+        isActive: true,
+        uploadedAt: timestamp,
+        uploadedBy: req.user.uid
+      };
+
+      await admin.firestore().collection('custom_pictograms').doc(pictogramId).set(pictogramData);
+
+      createdPictograms.push({
+        id: pictogramId,
+        ...pictogramData,
+        uploadedAt: currentTime
+      });
+    }
 
     res.json({
       success: true,
-      pictogram: {
-        id: pictogramId,
-        ...pictogramData,
-        uploadedAt: new Date()
-      }
+      message: `Pictogram uploaded successfully to ${createdPictograms.length} categor${createdPictograms.length === 1 ? 'y' : 'ies'}`,
+      pictograms: createdPictograms,
+      imageUrl: uploadResult.secure_url // Return the shared image URL
     });
   } catch (error) {
     console.error('Upload error:', error);
